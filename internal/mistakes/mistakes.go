@@ -1,11 +1,11 @@
 package mistakes
 
 import (
-	"bytes"
-	"encoding/json"
-	"fmt"
+	json "github.com/json-iterator/go"
 	"go.uber.org/zap"
 	"net/http"
+	"net/url"
+	"strings"
 )
 
 type Text struct {
@@ -13,35 +13,26 @@ type Text struct {
 }
 
 type SpellResult struct {
-	SpellError `json:"error"`
-	Word string `json:"word"`
-	S []string `json:"s"`
+	Code int      `json:"code"`
+	Pos  int      `json:"pos"`
+	Row  int      `json:"row"`
+	Col  int      `json:"col"`
+	Len  int      `json:"len"`
+	Word string   `json:"word"`
+	S    []string `json:"s"`
 }
 
-type SpellError struct {
-	Code int `json:"code"`
-	Pos int `json:"pos"`
-	Row int `json:"row"`
-	Col int `json:"col"`
-	Len int `json:"len"`
-}
-
-func CorrectMistakes(text Text, l *zap.Logger) (string,error) {
-	buffer := bytes.Buffer{}
-	err := json.NewEncoder(&buffer).Encode(text)
-	if err != nil {
-		return "", nil
+func CorrectMistakes(text string, l *zap.Logger) (string, error) {
+	data := url.Values{
+		"text":    {text},
+		"lang":    {"ru"},
+		"format":  {"plain"},
+		"options": {"524"},
 	}
-	req, err := http.NewRequest("POST", "https://speller.yandex.net/services/spellservice.json/checkText", &buffer)
+	resp, err := http.PostForm("https://speller.yandex.net/services/spellservice.json/checkText", data)
 	if err != nil {
 		return "", err
 	}
-	req.Header.Add("Content-Type", "application/json; charset=utf-8")
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return "", err
-	}
-	l.Info(fmt.Sprintf("sss %v", resp))
 	if resp.Body != nil {
 		defer resp.Body.Close()
 	}
@@ -50,6 +41,31 @@ func CorrectMistakes(text Text, l *zap.Logger) (string,error) {
 	if err != nil {
 		return "", err
 	}
-	l.Info(fmt.Sprintf("123 %v", res))
-	return "", nil
+	result := replaceMistakes(res, text)
+	return result, nil
+}
+
+func replaceMistakes(spellResult []SpellResult, text string) string {
+	words := make(map[int]string)
+	wordsCount := len(strings.Split(text, " "))
+	pos := make([]int, 0, wordsCount)
+	i := 0
+	for _, w := range strings.Split(text, " ") {
+		words[i] = w
+		pos = append(pos, i)
+		i += len([]rune(w)) + 1
+	}
+	for _, v := range spellResult {
+		if len(v.S) > 0 {
+			words[v.Pos] = v.S[0]
+		}
+	}
+	result := ""
+	for i, v := range pos {
+		result += words[v]
+		if i < wordsCount-1 {
+			result += " "
+		}
+	}
+	return result
 }
