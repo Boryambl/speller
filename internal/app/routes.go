@@ -17,15 +17,10 @@ func (r routes) correctMistakes(c *gin.Context) {
 	var text mistakes.Text
 	err := json.NewDecoder(c.Request.Body).Decode(&text)
 	if err != nil {
-		r.l.Error(fmt.Sprintf("text not found ") + "routes - correctMistakes")
-		c.AbortWithStatusJSON(http.StatusInternalServerError, fmt.Errorf("text not found"))
+		r.l.Error("text not found in request " + "routes - correctMistakes")
+		c.AbortWithStatusJSON(http.StatusInternalServerError, fmt.Errorf("text not found in request"))
 		return
 	}
-	result, err := mistakes.CorrectMistakes(text.Text, r.l)
-	if err != nil {
-		r.l.Error(err.Error() + "routes - correctMistakes")
-		c.AbortWithStatusJSON(http.StatusInternalServerError, err)
-		return
-	}
+	result := mistakes.CorrectMistakes(text)
 	c.JSON(http.StatusOK, result)
 }
