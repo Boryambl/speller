@@ -1,4 +1,4 @@
-# homework
+# speller
 
  - To build server use make
  - To configure the server port, change it in the file internal/app/config.json 
